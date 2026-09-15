@@ -39,6 +39,11 @@ class BuiltinClassifierTest {
     }
 
     @Test
+    fun quotedRmWordDoesNotBecomeDestructiveRemoval() = runTest {
+        assertEquals(Disposition.REVIEW, evaluate("echo rm").disposition)
+    }
+
+    @Test
     fun gitBranchMutationIsNotLowRiskAllowed() = runTest {
         assertEquals(Disposition.REVIEW, evaluate("git branch -D release").disposition)
     }
@@ -59,6 +64,11 @@ class BuiltinClassifierTest {
     @Test
     fun fileRemovalIsBlocked() = runTest {
         assertEquals(Disposition.BLOCK, evaluate("rm notes.txt").disposition)
+    }
+
+    @Test
+    fun sudoFileRemovalIsBlocked() = runTest {
+        assertEquals(Disposition.BLOCK, evaluate("sudo rm notes.txt").disposition)
     }
 
     @Test
