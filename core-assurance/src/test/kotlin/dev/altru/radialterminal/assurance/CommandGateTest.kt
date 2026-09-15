@@ -1,7 +1,7 @@
 package dev.altru.radialterminal.assurance
 
 import java.time.Instant
-import kotlinx.coroutines.CancellationException
+import java.util.concurrent.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -95,13 +95,30 @@ class CommandGateTest {
     }
 
     @Test
-    fun assuredExternalAllowCannotDowngradeLocalBlock() = runTest {
+    fun assuredLocalBlockShortCircuitsExternalProvider() = runTest {
+        var called = false
+        val external = object : AssuranceProvider {
+            override val id = "must-not-run"
+            override val version = "1"
+            override suspend fun evaluate(request: PreflightRequest): AssuranceDecision {
+                called = true
+                return AssuranceDecision(
+                    disposition = Disposition.ALLOW,
+                    provider = id,
+                    providerVersion = version,
+                    findings = emptyList(),
+                    decidedAt = now,
+                )
+            }
+        }
+
         val result = CommandGate(
-            assuredProvider = provider(Disposition.ALLOW),
+            assuredProvider = external,
             now = { now },
         ).evaluate(SessionMode.ASSURED, request("rm -rf /var/lib/example"))
 
         assertIs<GateResult.Deny>(result)
+        assertEquals(false, called)
     }
 
     @Test
@@ -156,6 +173,28 @@ class CommandGateTest {
 
         assertIs<GateResult.Confirm>(
             CommandGate(assuredProvider = malformed, now = { now })
+                .evaluate(SessionMode.ASSURED, request("git status")),
+        )
+    }
+
+    @Test
+    fun externalBypassClaimIsRejectedToReview() = runTest {
+        val invalid = object : AssuranceProvider {
+            override val id = "invalid-bypass"
+            override val version = "1"
+            override suspend fun evaluate(request: PreflightRequest) =
+                AssuranceDecision(
+                    disposition = Disposition.ALLOW,
+                    provider = id,
+                    providerVersion = version,
+                    findings = emptyList(),
+                    decidedAt = now,
+                    assuranceBypassed = true,
+                )
+        }
+
+        assertIs<GateResult.Confirm>(
+            CommandGate(assuredProvider = invalid, now = { now })
                 .evaluate(SessionMode.ASSURED, request("git status")),
         )
     }
