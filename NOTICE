@@ -1,0 +1,16 @@
+Radial Terminal
+Copyright 2026 Valentyn Rukhaylo / Altru.dev
+
+Radial Terminal is an independent project.
+
+The project may use or derive portions of software from the ConnectBot
+project and its related Apache-2.0-licensed libraries. When such source is
+incorporated, the original copyright and license notices must be preserved
+in the affected files and distributions.
+
+ConnectBot is an independent upstream project and is not affiliated with
+or endorsing Radial Terminal unless explicitly stated by its maintainers.
+
+DDC, DDC Radial, DDCRE, DSR, Agent Replay, and related Altru.dev components
+are separate systems. Radial Terminal's core product must not require them
+to provide ordinary SSH terminal functionality.
