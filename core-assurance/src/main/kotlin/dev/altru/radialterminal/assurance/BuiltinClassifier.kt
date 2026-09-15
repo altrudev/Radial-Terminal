@@ -38,72 +38,67 @@ class BuiltinClassifier : AssuranceProvider {
         }
 
         mark(
-            Regex("""(^|[;&|]s*)sudo""", RegexOption.IGNORE_CASE),
+            Regex("""(^|[;&|]\s*)sudo\b""", RegexOption.IGNORE_CASE),
             FindingKind.PRIVILEGE_ESCALATION,
             "Command requests elevated execution authority.",
         )
         mark(
-            Regex("""rms+[^
-]*(-[^
-]*r[^
-]*f|-rf|-fr)""", RegexOption.IGNORE_CASE),
+            Regex("""\brm\s+[^\n]*(-[^\n]*r[^\n]*f|-rf|-fr)\b""", RegexOption.IGNORE_CASE),
             FindingKind.DESTRUCTIVE_FILESYSTEM,
             "Recursive forced removal detected.",
         )
         mark(
-            Regex("""mkfs(?:.[A-Za-z0-9_-]+)?""", RegexOption.IGNORE_CASE),
+            Regex("""\bmkfs(?:\.[A-Za-z0-9_-]+)?\b""", RegexOption.IGNORE_CASE),
             FindingKind.FILESYSTEM_FORMAT,
             "Filesystem formatting operation detected.",
         )
         mark(
-            Regex("""dd[^
-]*of=/dev/""", RegexOption.IGNORE_CASE),
+            Regex("""\bdd\b[^\n]*\bof=/dev/""", RegexOption.IGNORE_CASE),
             FindingKind.RAW_DEVICE_WRITE,
             "Raw device write detected.",
         )
         mark(
-            Regex("""(shutdown|reboot|poweroff|halt)""", RegexOption.IGNORE_CASE),
+            Regex("""\b(shutdown|reboot|poweroff|halt)\b""", RegexOption.IGNORE_CASE),
             FindingKind.SYSTEM_POWER_CHANGE,
             "System power-state change detected.",
         )
         mark(
-            Regex("""terraforms+destroy""", RegexOption.IGNORE_CASE),
+            Regex("""\bterraform\s+destroy\b""", RegexOption.IGNORE_CASE),
             FindingKind.INFRASTRUCTURE_DESTROY,
             "Infrastructure destruction operation detected.",
         )
         mark(
-            Regex("""(systemctl|service)s+(stop|disable|mask|restart)""", RegexOption.IGNORE_CASE),
+            Regex("""\b(systemctl|service)\s+(stop|disable|mask|restart)\b""", RegexOption.IGNORE_CASE),
             FindingKind.SERVICE_STATE_CHANGE,
             "Service state mutation detected.",
         )
         mark(
-            Regex("""(apt|apt-get|dnf|yum|pacman)s+(remove|purge|autoremove|erase)""", RegexOption.IGNORE_CASE),
+            Regex("""\b(apt|apt-get|dnf|yum|pacman)\s+(remove|purge|autoremove|erase)\b""", RegexOption.IGNORE_CASE),
             FindingKind.PACKAGE_STATE_CHANGE,
             "Package removal detected.",
         )
         mark(
-            Regex("""(iptables|nft|ufw|firewall-cmd)""", RegexOption.IGNORE_CASE),
+            Regex("""\b(iptables|nft|ufw|firewall-cmd)\b""", RegexOption.IGNORE_CASE),
             FindingKind.NETWORK_POLICY_CHANGE,
             "Network policy mutation may occur.",
         )
         mark(
-            Regex("""(chmod|chown|userdel|groupdel|passwd)""", RegexOption.IGNORE_CASE),
+            Regex("""\b(chmod|chown|userdel|groupdel|passwd)\b""", RegexOption.IGNORE_CASE),
             FindingKind.IDENTITY_OR_PERMISSION_CHANGE,
             "Identity or permission state may change.",
         )
         mark(
-            Regex("""(drops+(database|table)|truncates+table)""", RegexOption.IGNORE_CASE),
+            Regex("""\b(drop\s+(database|table)|truncate\s+table)\b""", RegexOption.IGNORE_CASE),
             FindingKind.DATABASE_MUTATION,
             "Potentially destructive database mutation detected.",
         )
         mark(
-            Regex("""(dockers+systems+prune|kubectls+delete|helms+uninstall)""", RegexOption.IGNORE_CASE),
+            Regex("""\b(docker\s+system\s+prune|kubectl\s+delete|helm\s+uninstall)\b""", RegexOption.IGNORE_CASE),
             FindingKind.CONTAINER_OR_CLUSTER_MUTATION,
             "Container or cluster state mutation detected.",
         )
         mark(
-            Regex("""gits+push[^
-]*(--force(?:-with-lease)?|-f)""", RegexOption.IGNORE_CASE),
+            Regex("""\bgit\s+push\b[^\n]*(--force(?:-with-lease)?|-f)\b""", RegexOption.IGNORE_CASE),
             FindingKind.FORCE_OPERATION,
             "Forced Git push detected.",
         )
@@ -151,11 +146,11 @@ class BuiltinClassifier : AssuranceProvider {
         )
 
         private val LOW_RISK_PATTERNS = listOf(
-            Regex("""s*(pwd|whoami|id|hostname|uname(?:s+.*)?|date)s*""", RegexOption.IGNORE_CASE),
-            Regex("""s*gits+(status|diff|log|show|branch)(?:s+.*)?""", RegexOption.IGNORE_CASE),
-            Regex("""s*(ls|find|stat|du|df)(?:s+.*)?""", RegexOption.IGNORE_CASE),
-            Regex("""s*(cat|head|tail|less|more)(?:s+.*)?""", RegexOption.IGNORE_CASE),
-            Regex("""s*(ps|top|uptime|free)(?:s+.*)?""", RegexOption.IGNORE_CASE),
+            Regex("""\s*(pwd|whoami|id|hostname|uname(?:\s+.*)?|date)\s*""", RegexOption.IGNORE_CASE),
+            Regex("""\s*git\s+(status|diff|log|show|branch)(?:\s+.*)?""", RegexOption.IGNORE_CASE),
+            Regex("""\s*(ls|find|stat|du|df)(?:\s+.*)?""", RegexOption.IGNORE_CASE),
+            Regex("""\s*(cat|head|tail|less|more)(?:\s+.*)?""", RegexOption.IGNORE_CASE),
+            Regex("""\s*(ps|top|uptime|free)(?:\s+.*)?""", RegexOption.IGNORE_CASE),
         )
     }
 }
