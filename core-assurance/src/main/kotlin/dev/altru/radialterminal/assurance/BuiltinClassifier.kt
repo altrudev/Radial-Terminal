@@ -145,6 +145,8 @@ class BuiltinClassifier : AssuranceProvider {
             FindingKind.FILESYSTEM_FORMAT,
             FindingKind.RAW_DEVICE_WRITE,
             FindingKind.INFRASTRUCTURE_DESTROY,
+            FindingKind.SYSTEM_POWER_CHANGE,
+            FindingKind.CONTAINER_OR_CLUSTER_MUTATION,
         )
 
         private val SHELL_CONTROL_SYNTAX =
