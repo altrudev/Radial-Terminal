@@ -6,11 +6,11 @@ Radial Terminal is a standalone terminal client designed to preserve ordinary SS
 
 The product is being developed by **Valentyn Rukhaylo / Altru.dev**.
 
-> Status: v0.2 Android operator shell in development.
+> Status: v0.2 Android operator shell under verification.
 
 ## Product boundary
 
-Radial Terminal must remain useful without DDC, DDCRE, DSR, or any other Altru.dev infrastructure.
+Radial Terminal must remain useful without DDC, DDCRE, DSR, Agent Replay, a cloud account, or telemetry.
 
 Optional adapters may add deeper assurance:
 
@@ -19,35 +19,43 @@ Optional adapters may add deeper assurance:
 - DSR — independently observed execution evidence
 - Agent Replay — incident reconstruction
 
-The core terminal, SSH connectivity, host management, command history, local receipts, and built-in static risk classification remain standalone.
-
 ## Current milestone
 
-v0.2 establishes:
+v0.2 now establishes:
 
 - Android Compose application shell
 - Direct / Guarded / Assured session modes
-- local command preflight
-- fail-closed Assured-mode degradation
-- visible ALLOW / REVIEW / BLOCK results
+- explicit Direct-mode bypass provenance
+- conservative local command preflight
+- unknown commands default to REVIEW
+- monotonic local + external assurance composition
+- fail-closed external provider handling
+- stale-decision handling
+- structured action-receipt schema
 - Java 17 compatibility across Android and assurance core
-- explicit upstream integration plan for ConnectBot termlib and cbssh
+- dependency-first integration plan for ConnectBot termlib and cbssh
 
-Real SSH transport and terminal-emulator wiring are intentionally the next milestone. The project does not yet claim that arbitrary interactive shell bytes can be reconstructed into authoritative command semantics.
+The current UI is a preflight demo only. It does not yet connect to SSH or execute commands, and it labels that limitation explicitly.
+
+## Assurance rule
+
+```text
+ALLOW < REVIEW < BLOCK
+```
+
+Assured mode may never reduce the local Guarded result.
 
 ## Design principle
 
 ```text
-request -> preflight -> execute -> observe -> receipt
+request -> preflight -> proceed/confirm/stop -> execute -> observe -> receipt
 ```
 
-Ordinary read-only terminal use should remain low-friction. Potentially destructive or authority-changing operations can be classified, inspected, confirmed, and recorded.
+Preflight permission is not the same thing as execution.
 
 ## Upstream strategy
 
-Radial Terminal is intended to use or derive from Apache-2.0-licensed ConnectBot components while preserving all required upstream notices and attribution. Any incorporated upstream source must retain its applicable copyright and license notices.
-
-A dependency-first approach is preferred where practical: use maintained ConnectBot libraries such as its terminal and SSH components rather than copying application code unnecessarily.
+Radial Terminal is intended to consume Apache-2.0-licensed ConnectBot components while preserving all required upstream notices and attribution. A dependency-first approach is preferred over wholesale application copying.
 
 ## License
 
