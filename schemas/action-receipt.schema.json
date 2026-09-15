@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://radial-terminal.altru.dev/schemas/action-receipt.schema.json",
+  "title": "Radial Terminal Action Receipt",
+  "type": "object",
+  "required": [
+    "receipt_version",
+    "session_id",
+    "host_id",
+    "requested_command_sha256",
+    "provider",
+    "disposition",
+    "requested_at"
+  ],
+  "properties": {
+    "receipt_version": { "const": "0.1" },
+    "session_id": { "type": "string", "minLength": 1 },
+    "host_id": { "type": "string", "minLength": 1 },
+    "requested_command_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "provider": { "type": "string", "minLength": 1 },
+    "provider_version": { "type": "string" },
+    "disposition": {
+      "enum": ["ALLOW", "REVIEW", "BLOCK"]
+    },
+    "findings": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "requested_at": { "type": "string", "format": "date-time" },
+    "executed_at": { "type": ["string", "null"], "format": "date-time" },
+    "exit_code": { "type": ["integer", "null"] },
+    "observations": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}
