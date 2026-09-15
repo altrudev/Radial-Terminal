@@ -4,33 +4,45 @@
 
 Radial Terminal is a terminal first and an assurance client second.
 
-A user must be able to connect to a standard SSH server and use the terminal
-without DDC, DDCRE, DSR, Agent Replay, an account, telemetry, or a remote
-control plane.
+A user must eventually be able to connect to a standard SSH server and use the terminal without DDC, DDCRE, DSR, Agent Replay, an account, telemetry, or a remote control plane.
 
-## Execution pipeline
+## State-transition boundary
 
-```text
-input
-  |
-  v
-command parser
-  |
-  +---- non-mutating / low-risk ----> execute
-  |
-  v
-assurance preflight
-  |
-  +---- ALLOW ----------------------> execute
-  +---- REVIEW ---> explicit user confirmation ---> execute/cancel
-  +---- BLOCK ----------------------> stop
-  |
-  v
-observation
-  |
-  v
-local action receipt
-```
+Preflight permission and actual execution are different transitions:
+
+requested command
+-> preflight request validation
+-> local classifier
+-> optional external assurance
+-> monotonic combination
+-> ALLOW / REVIEW / BLOCK
+-> Proceed / Confirm / Stop
+-> explicit execution boundary
+-> execute
+-> observe
+-> receipt
+
+Proceed means the preflight gate permits continuing. It does not mean an action has already executed.
+
+## Monotonic assurance rule
+
+External assurance can never reduce the severity of the local baseline.
+
+Severity ordering:
+
+ALLOW < REVIEW < BLOCK
+
+Assured mode takes the maximum severity across local and external decisions. Provider failure, absence, invalidity, or staleness is REVIEW.
+
+## Representation boundary
+
+Raw terminal bytes are not authoritative command semantics. Aliases, shell functions, multiline editing, expansion, subshells, bracketed paste, and nested interactive programs can change behavior.
+
+Therefore the project does not infer authoritative executed-command identity from a newline in an interactive PTY.
+
+## Target identity
+
+Display hostname is not proof of target identity. Before live SSH execution, the assurance and receipt boundary must bind to verified SSH host-key identity, hostname, and port.
 
 ## Modules
 
@@ -38,47 +50,25 @@ local action receipt
 Terminal rendering, input, escape handling, session lifecycle.
 
 ### ssh-provider
-Standard SSH transport. Preferred implementation strategy is to consume
-maintained upstream libraries rather than copy application code where
-practical.
+Standard SSH transport behind a narrow interface.
 
 ### assurance-core
-Standalone deterministic risk classifier and common assurance data model.
-It must be local-first and must not require network access.
+Standalone local-first risk classifier and common decision model.
 
 ### assurance-ddc
-Optional adapter. Sends the normalized preflight envelope to a configured
-DDC Radial endpoint/runtime and maps the response into the common
-disposition model.
+Optional asynchronous external assurance adapter.
+
+### receipt-store
+Local receipt persistence. Export is explicit.
 
 ### executor-ddcre
-Optional governed execution adapter.
+Optional governed remote execution adapter.
 
 ### evidence-dsr
 Optional independently observed evidence transport.
 
 ### replay-export
-Exports an incident/session bundle consumable by Agent Replay or another
-compatible reconstruction system.
-
-### receipt-store
-Local receipt storage. Export is explicit.
-
-## Common decision model
-
-```text
-ALLOW   - operation may proceed without additional assurance interaction
-REVIEW  - explicit operator confirmation required
-BLOCK   - operation must not execute through the guarded path
-```
-
-A provider may attach findings without changing the three-state contract.
-
-## Trust boundary
-
-The terminal must never silently promote an external adapter's result.
-Adapter identity, policy version, and evidence freshness are part of the
-decision envelope.
+Optional Agent Replay/session export.
 
 ## Privacy
 
@@ -89,5 +79,4 @@ Default:
 - local history
 - local receipts
 
-Any external assurance adapter is opt-in and visibly configured per host or
-profile.
+Any external assurance adapter is opt-in and visibly configured per host or profile.
