@@ -11,7 +11,7 @@ import java.time.Instant
  */
 class BuiltinClassifier : AssuranceProvider {
     override val id: String = "builtin-static"
-    override val version: String = "0.2.1"
+    override val version: String = "0.2.2"
 
     override suspend fun evaluate(request: PreflightRequest): AssuranceDecision {
         val command = request.command.trim()
@@ -43,7 +43,7 @@ class BuiltinClassifier : AssuranceProvider {
             "Command requests elevated execution authority.",
         )
         mark(
-            Regex("""(^|[;&|]\s*)rm\b""", RegexOption.IGNORE_CASE),
+            Regex("""\brm\b""", RegexOption.IGNORE_CASE),
             FindingKind.DESTRUCTIVE_FILESYSTEM,
             "File removal operation detected.",
         )
