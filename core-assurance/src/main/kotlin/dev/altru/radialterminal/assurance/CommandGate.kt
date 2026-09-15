@@ -1,6 +1,7 @@
 package dev.altru.radialterminal.assurance
 
 import java.time.Instant
+import kotlinx.coroutines.CancellationException
 
 enum class SessionMode {
     DIRECT,
@@ -9,27 +10,11 @@ enum class SessionMode {
 }
 
 sealed interface GateResult {
-    data class Proceed(
-        val decision: AssuranceDecision,
-    ) : GateResult
-
-    data class Confirm(
-        val decision: AssuranceDecision,
-    ) : GateResult
-
-    data class Deny(
-        val decision: AssuranceDecision,
-    ) : GateResult
+    data class Proceed(val decision: AssuranceDecision) : GateResult
+    data class Confirm(val decision: AssuranceDecision) : GateResult
+    data class Deny(val decision: AssuranceDecision) : GateResult
 }
 
-/**
- * Maps assurance decisions into operator-facing pre-execution behavior.
- *
- * DIRECT deliberately bypasses assurance but still emits provenance.
- * GUARDED uses the local provider.
- * ASSURED always evaluates the local baseline and may only preserve or increase
- * severity when combining with the external provider.
- */
 class CommandGate(
     private val localProvider: AssuranceProvider = BuiltinClassifier(),
     private val assuredProvider: AssuranceProvider? = null,
@@ -44,18 +29,8 @@ class CommandGate(
 
     private suspend fun evaluateAssured(request: PreflightRequest): GateResult {
         val local = evaluateLocalSafely(request)
-
-        val external = assuredProvider?.let { provider ->
-            runCatching { provider.evaluate(request) }
-                .map { validateExternal(it) }
-                .getOrElse {
-                    degradedDecision(
-                        "External assurance provider failed or returned an invalid decision.",
-                    )
-                }
-        } ?: degradedDecision(
-            "Assured mode has no external assurance provider configured.",
-        )
+        val external = assuredProvider?.let { evaluateExternalSafely(it, request) }
+            ?: degradedDecision("Assured mode has no external assurance provider configured.")
 
         val freshExternal =
             if (external.validUntil != null && now().isAfter(external.validUntil)) {
@@ -68,10 +43,27 @@ class CommandGate(
     }
 
     private suspend fun evaluateLocalSafely(request: PreflightRequest): AssuranceDecision =
-        runCatching { localProvider.evaluate(request) }
-            .getOrElse {
-                degradedDecision("Local assurance provider failed; execution requires review.")
-            }
+        try {
+            localProvider.evaluate(request)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Throwable) {
+            degradedDecision("Local assurance provider failed; execution requires review.")
+        }
+
+    private suspend fun evaluateExternalSafely(
+        provider: AssuranceProvider,
+        request: PreflightRequest,
+    ): AssuranceDecision =
+        try {
+            validateExternal(provider.evaluate(request))
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Throwable) {
+            degradedDecision(
+                "External assurance provider failed or returned an invalid decision.",
+            )
+        }
 
     private fun validateExternal(decision: AssuranceDecision): AssuranceDecision {
         require(decision.provider.isNotBlank()) { "provider must not be blank" }
@@ -117,7 +109,7 @@ class CommandGate(
             Disposition.BLOCK -> GateResult.Deny(decision)
         }
 
-    private fun directBypassDecision(): AssuranceDecision =
+    private fun directBypassDecision() =
         AssuranceDecision(
             disposition = Disposition.ALLOW,
             provider = "direct-bypass",
@@ -127,16 +119,13 @@ class CommandGate(
             assuranceBypassed = true,
         )
 
-    private fun degradedDecision(summary: String): AssuranceDecision =
+    private fun degradedDecision(summary: String) =
         AssuranceDecision(
             disposition = Disposition.REVIEW,
             provider = "assurance-unavailable",
             providerVersion = "1",
             findings = listOf(
-                Finding(
-                    kind = FindingKind.UNKNOWN_HIGH_IMPACT,
-                    summary = summary,
-                ),
+                Finding(FindingKind.UNKNOWN_HIGH_IMPACT, summary),
             ),
             decidedAt = now(),
         )
