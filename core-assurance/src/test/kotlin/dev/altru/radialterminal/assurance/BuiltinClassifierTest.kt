@@ -87,11 +87,16 @@ class BuiltinClassifierTest {
     }
 
     @Test
-    fun clusterDeletionRequiresReview() = runTest {
+    fun clusterDeletionIsBlocked() = runTest {
         assertEquals(
-            Disposition.REVIEW,
+            Disposition.BLOCK,
             evaluate("kubectl delete deployment api").disposition,
         )
+    }
+
+    @Test
+    fun systemPowerChangeIsBlocked() = runTest {
+        assertEquals(Disposition.BLOCK, evaluate("reboot").disposition)
     }
 
     @Test
