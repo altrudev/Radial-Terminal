@@ -38,18 +38,19 @@ class CommandGate(
     suspend fun evaluate(mode: SessionMode, request: PreflightRequest): GateResult =
         when (mode) {
             SessionMode.DIRECT -> mapDecision(directBypassDecision())
-            SessionMode.GUARDED -> mapDecision(localProvider.evaluate(request))
+            SessionMode.GUARDED -> mapDecision(evaluateLocalSafely(request))
             SessionMode.ASSURED -> evaluateAssured(request)
         }
 
     private suspend fun evaluateAssured(request: PreflightRequest): GateResult {
-        val local = localProvider.evaluate(request)
+        val local = evaluateLocalSafely(request)
 
         val external = assuredProvider?.let { provider ->
             runCatching { provider.evaluate(request) }
+                .map { validateExternal(it) }
                 .getOrElse {
                     degradedDecision(
-                        "External assurance provider failed; execution requires review.",
+                        "External assurance provider failed or returned an invalid decision.",
                     )
                 }
         } ?: degradedDecision(
@@ -64,6 +65,21 @@ class CommandGate(
             }
 
         return mapDecision(combineMonotonically(local, freshExternal))
+    }
+
+    private suspend fun evaluateLocalSafely(request: PreflightRequest): AssuranceDecision =
+        runCatching { localProvider.evaluate(request) }
+            .getOrElse {
+                degradedDecision("Local assurance provider failed; execution requires review.")
+            }
+
+    private fun validateExternal(decision: AssuranceDecision): AssuranceDecision {
+        require(decision.provider.isNotBlank()) { "provider must not be blank" }
+        require(decision.providerVersion.isNotBlank()) { "provider version must not be blank" }
+        require(
+            decision.validUntil == null || !decision.validUntil.isBefore(decision.decidedAt),
+        ) { "validUntil precedes decidedAt" }
+        return decision
     }
 
     private fun combineMonotonically(
