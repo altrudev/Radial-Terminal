@@ -43,7 +43,7 @@ class BuiltinClassifier : AssuranceProvider {
             "Command requests elevated execution authority.",
         )
         mark(
-            Regex("""\brm\b""", RegexOption.IGNORE_CASE),
+            Regex("""(^|[;&|]\s*|\bsudo\s+)rm\b""", RegexOption.IGNORE_CASE),
             FindingKind.DESTRUCTIVE_FILESYSTEM,
             "File removal operation detected.",
         )
