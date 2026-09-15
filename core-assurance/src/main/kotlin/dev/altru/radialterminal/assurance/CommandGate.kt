@@ -1,7 +1,7 @@
 package dev.altru.radialterminal.assurance
 
 import java.time.Instant
-import kotlinx.coroutines.CancellationException
+import java.util.concurrent.CancellationException
 
 enum class SessionMode {
     DIRECT,
@@ -29,6 +29,10 @@ class CommandGate(
 
     private suspend fun evaluateAssured(request: PreflightRequest): GateResult {
         val local = evaluateLocalSafely(request)
+        if (local.disposition == Disposition.BLOCK) {
+            return GateResult.Deny(local)
+        }
+
         val external = assuredProvider?.let { evaluateExternalSafely(it, request) }
             ?: degradedDecision("Assured mode has no external assurance provider configured.")
 
@@ -47,7 +51,7 @@ class CommandGate(
             localProvider.evaluate(request)
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Throwable) {
+        } catch (_: Exception) {
             degradedDecision("Local assurance provider failed; execution requires review.")
         }
 
@@ -59,7 +63,7 @@ class CommandGate(
             validateExternal(provider.evaluate(request))
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Throwable) {
+        } catch (_: Exception) {
             degradedDecision(
                 "External assurance provider failed or returned an invalid decision.",
             )
@@ -68,6 +72,7 @@ class CommandGate(
     private fun validateExternal(decision: AssuranceDecision): AssuranceDecision {
         require(decision.provider.isNotBlank()) { "provider must not be blank" }
         require(decision.providerVersion.isNotBlank()) { "provider version must not be blank" }
+        require(!decision.assuranceBypassed) { "external provider cannot declare assurance bypass" }
         require(
             decision.validUntil == null || !decision.validUntil.isBefore(decision.decidedAt),
         ) { "validUntil precedes decidedAt" }
