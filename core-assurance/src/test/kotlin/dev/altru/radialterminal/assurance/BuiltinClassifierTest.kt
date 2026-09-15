@@ -34,11 +34,31 @@ class BuiltinClassifierTest {
     }
 
     @Test
+    fun shellRedirectionPreventsLowRiskAllow() = runTest {
+        assertEquals(Disposition.REVIEW, evaluate("ls > inventory.txt").disposition)
+    }
+
+    @Test
+    fun gitBranchMutationIsNotLowRiskAllowed() = runTest {
+        assertEquals(Disposition.REVIEW, evaluate("git branch -D release").disposition)
+    }
+
+    @Test
+    fun findDeleteIsNotLowRiskAllowed() = runTest {
+        assertEquals(Disposition.REVIEW, evaluate("find . -delete").disposition)
+    }
+
+    @Test
     fun serviceRestartRequiresReview() = runTest {
         assertEquals(
             Disposition.REVIEW,
             evaluate("sudo systemctl restart nginx").disposition,
         )
+    }
+
+    @Test
+    fun fileRemovalIsBlocked() = runTest {
+        assertEquals(Disposition.BLOCK, evaluate("rm notes.txt").disposition)
     }
 
     @Test
