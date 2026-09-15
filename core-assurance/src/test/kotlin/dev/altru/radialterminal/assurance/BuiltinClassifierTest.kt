@@ -1,13 +1,14 @@
 package dev.altru.radialterminal.assurance
 
 import java.time.Instant
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class BuiltinClassifierTest {
     private val classifier = BuiltinClassifier()
 
-    private fun evaluate(command: String): AssuranceDecision =
+    private suspend fun evaluate(command: String): AssuranceDecision =
         classifier.evaluate(
             PreflightRequest(
                 sessionId = "session-test",
@@ -18,12 +19,22 @@ class BuiltinClassifierTest {
         )
 
     @Test
-    fun readOnlyCommandIsAllowed() {
+    fun recognizedReadOnlyCommandIsAllowed() = runTest {
         assertEquals(Disposition.ALLOW, evaluate("git status").disposition)
     }
 
     @Test
-    fun serviceRestartRequiresReview() {
+    fun unknownCommandRequiresReview() = runTest {
+        assertEquals(Disposition.REVIEW, evaluate("mystery-tool --do-something").disposition)
+    }
+
+    @Test
+    fun tailFollowDoesNotTriggerGenericForceFinding() = runTest {
+        assertEquals(Disposition.ALLOW, evaluate("tail -f app.log").disposition)
+    }
+
+    @Test
+    fun serviceRestartRequiresReview() = runTest {
         assertEquals(
             Disposition.REVIEW,
             evaluate("sudo systemctl restart nginx").disposition,
@@ -31,15 +42,33 @@ class BuiltinClassifierTest {
     }
 
     @Test
-    fun recursiveForcedRemovalIsBlocked() {
+    fun recursiveForcedRemovalIsBlocked() = runTest {
         assertEquals(Disposition.BLOCK, evaluate("rm -rf /var/lib/example").disposition)
     }
 
     @Test
-    fun clusterDeletionRequiresReview() {
+    fun filesystemFormatIsBlocked() = runTest {
+        assertEquals(Disposition.BLOCK, evaluate("mkfs.ext4 /dev/sdb1").disposition)
+    }
+
+    @Test
+    fun rawDeviceWriteIsBlocked() = runTest {
+        assertEquals(Disposition.BLOCK, evaluate("dd if=image.img of=/dev/sdb").disposition)
+    }
+
+    @Test
+    fun clusterDeletionRequiresReview() = runTest {
         assertEquals(
             Disposition.REVIEW,
             evaluate("kubectl delete deployment api").disposition,
+        )
+    }
+
+    @Test
+    fun oversizedCommandRequiresReview() = runTest {
+        assertEquals(
+            Disposition.REVIEW,
+            evaluate("x".repeat(BuiltinClassifier.MAX_COMMAND_CHARS + 1)).disposition,
         )
     }
 }
