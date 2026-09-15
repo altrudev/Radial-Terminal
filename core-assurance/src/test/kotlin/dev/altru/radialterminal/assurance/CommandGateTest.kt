@@ -1,9 +1,11 @@
 package dev.altru.radialterminal.assurance
 
 import java.time.Instant
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -20,6 +22,7 @@ class CommandGateTest {
 
     private fun provider(
         disposition: Disposition,
+        decidedAt: Instant = now,
         validUntil: Instant? = null,
     ) = object : AssuranceProvider {
         override val id = "external-test"
@@ -31,7 +34,7 @@ class CommandGateTest {
                 provider = id,
                 providerVersion = version,
                 findings = emptyList(),
-                decidedAt = now,
+                decidedAt = decidedAt,
                 validUntil = validUntil,
             )
     }
@@ -77,6 +80,21 @@ class CommandGateTest {
     }
 
     @Test
+    fun localProviderFailureDegradesToReview() = runTest {
+        val broken = object : AssuranceProvider {
+            override val id = "broken-local"
+            override val version = "1"
+            override suspend fun evaluate(request: PreflightRequest): AssuranceDecision =
+                error("local failure")
+        }
+
+        assertIs<GateResult.Confirm>(
+            CommandGate(localProvider = broken, now = { now })
+                .evaluate(SessionMode.GUARDED, request("git status")),
+        )
+    }
+
+    @Test
     fun assuredExternalAllowCannotDowngradeLocalBlock() = runTest {
         val result = CommandGate(
             assuredProvider = provider(Disposition.ALLOW),
@@ -111,13 +129,50 @@ class CommandGateTest {
     fun staleExternalAllowRequiresReview() = runTest {
         val result = CommandGate(
             assuredProvider = provider(
-                Disposition.ALLOW,
+                disposition = Disposition.ALLOW,
+                decidedAt = now.minusSeconds(10),
                 validUntil = now.minusSeconds(1),
             ),
             now = { now },
         ).evaluate(SessionMode.ASSURED, request("git status"))
 
         assertIs<GateResult.Confirm>(result)
+    }
+
+    @Test
+    fun malformedExternalDecisionRequiresReview() = runTest {
+        val malformed = object : AssuranceProvider {
+            override val id = "malformed"
+            override val version = "1"
+            override suspend fun evaluate(request: PreflightRequest) =
+                AssuranceDecision(
+                    disposition = Disposition.ALLOW,
+                    provider = "",
+                    providerVersion = "",
+                    findings = emptyList(),
+                    decidedAt = now,
+                )
+        }
+
+        assertIs<GateResult.Confirm>(
+            CommandGate(assuredProvider = malformed, now = { now })
+                .evaluate(SessionMode.ASSURED, request("git status")),
+        )
+    }
+
+    @Test
+    fun cancellationIsNotConvertedToReview() = runTest {
+        val cancelled = object : AssuranceProvider {
+            override val id = "cancelled"
+            override val version = "1"
+            override suspend fun evaluate(request: PreflightRequest): AssuranceDecision =
+                throw CancellationException("cancel")
+        }
+
+        assertFailsWith<CancellationException> {
+            CommandGate(assuredProvider = cancelled, now = { now })
+                .evaluate(SessionMode.ASSURED, request("git status"))
+        }
     }
 
     @Test
