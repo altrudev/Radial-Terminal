@@ -7,11 +7,11 @@ import java.time.Instant
  *
  * This is intentionally not a shell semantic prover. It identifies command
  * patterns that deserve additional operator attention and only ALLOWs a small,
- * explicit set of recognized low-risk command families.
+ * explicit set of recognized low-risk command shapes.
  */
 class BuiltinClassifier : AssuranceProvider {
     override val id: String = "builtin-static"
-    override val version: String = "0.2.0"
+    override val version: String = "0.2.1"
 
     override suspend fun evaluate(request: PreflightRequest): AssuranceDecision {
         val command = request.command.trim()
@@ -43,9 +43,9 @@ class BuiltinClassifier : AssuranceProvider {
             "Command requests elevated execution authority.",
         )
         mark(
-            Regex("""\brm\s+[^\n]*(-[^\n]*r[^\n]*f|-rf|-fr)\b""", RegexOption.IGNORE_CASE),
+            Regex("""(^|[;&|]\s*)rm\b""", RegexOption.IGNORE_CASE),
             FindingKind.DESTRUCTIVE_FILESYSTEM,
-            "Recursive forced removal detected.",
+            "File removal operation detected.",
         )
         mark(
             Regex("""\bmkfs(?:\.[A-Za-z0-9_-]+)?\b""", RegexOption.IGNORE_CASE),
@@ -131,8 +131,10 @@ class BuiltinClassifier : AssuranceProvider {
         decidedAt = Instant.now(),
     )
 
-    private fun isRecognizedLowRisk(command: String): Boolean =
-        LOW_RISK_PATTERNS.any { it.matches(command) }
+    private fun isRecognizedLowRisk(command: String): Boolean {
+        if (SHELL_CONTROL_SYNTAX.containsMatchIn(command)) return false
+        return LOW_RISK_PATTERNS.any { it.matches(command) }
+    }
 
     companion object {
         const val MAX_COMMAND_CHARS = 16_384
@@ -145,12 +147,16 @@ class BuiltinClassifier : AssuranceProvider {
             FindingKind.INFRASTRUCTURE_DESTROY,
         )
 
+        private val SHELL_CONTROL_SYNTAX =
+            Regex("""[;&|<>\u0060]|\$\(|\r|\n""")
+
         private val LOW_RISK_PATTERNS = listOf(
-            Regex("""\s*(pwd|whoami|id|hostname|uname(?:\s+.*)?|date)\s*""", RegexOption.IGNORE_CASE),
-            Regex("""\s*git\s+(status|diff|log|show|branch)(?:\s+.*)?""", RegexOption.IGNORE_CASE),
-            Regex("""\s*(ls|find|stat|du|df)(?:\s+.*)?""", RegexOption.IGNORE_CASE),
-            Regex("""\s*(cat|head|tail|less|more)(?:\s+.*)?""", RegexOption.IGNORE_CASE),
-            Regex("""\s*(ps|top|uptime|free)(?:\s+.*)?""", RegexOption.IGNORE_CASE),
+            Regex("""\s*(pwd|whoami|id|hostname|date)\s*""", RegexOption.IGNORE_CASE),
+            Regex("""\s*uname(?:\s+[-A-Za-z0-9]+)*\s*""", RegexOption.IGNORE_CASE),
+            Regex("""\s*git\s+status(?:\s+(--short|--porcelain(?:=[A-Za-z0-9]+)?|-s|-b|--branch))*\s*""", RegexOption.IGNORE_CASE),
+            Regex("""\s*(ls|stat|du|df)(?:\s+[-A-Za-z0-9_./~]+)*\s*""", RegexOption.IGNORE_CASE),
+            Regex("""\s*(cat|head|tail)(?:\s+[-A-Za-z0-9_./~=+]+)*\s*""", RegexOption.IGNORE_CASE),
+            Regex("""\s*(ps|uptime|free)(?:\s+[-A-Za-z0-9_]+)*\s*""", RegexOption.IGNORE_CASE),
         )
     }
 }
