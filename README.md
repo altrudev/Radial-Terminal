@@ -6,7 +6,7 @@ Radial Terminal is a standalone terminal client designed to preserve ordinary SS
 
 The product is being developed by **Valentyn Rukhaylo / Altru.dev**.
 
-> Status: early architecture and implementation.
+> Status: v0.2 Android operator shell in development.
 
 ## Product boundary
 
@@ -20,6 +20,20 @@ Optional adapters may add deeper assurance:
 - Agent Replay — incident reconstruction
 
 The core terminal, SSH connectivity, host management, command history, local receipts, and built-in static risk classification remain standalone.
+
+## Current milestone
+
+v0.2 establishes:
+
+- Android Compose application shell
+- Direct / Guarded / Assured session modes
+- local command preflight
+- fail-closed Assured-mode degradation
+- visible ALLOW / REVIEW / BLOCK results
+- Java 17 compatibility across Android and assurance core
+- explicit upstream integration plan for ConnectBot termlib and cbssh
+
+Real SSH transport and terminal-emulator wiring are intentionally the next milestone. The project does not yet claim that arbitrary interactive shell bytes can be reconstructed into authoritative command semantics.
 
 ## Design principle
 
@@ -37,6 +51,6 @@ A dependency-first approach is preferred where practical: use maintained Connect
 
 ## License
 
-Apache License 2.0 is planned for the open-source core. See the repository license and notices as they are added.
+Apache License 2.0.
 
 Copyright 2026 Valentyn Rukhaylo / Altru.dev.
