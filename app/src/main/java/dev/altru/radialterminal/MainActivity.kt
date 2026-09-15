@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -35,6 +36,7 @@ import dev.altru.radialterminal.assurance.PreflightRequest
 import dev.altru.radialterminal.assurance.SessionMode
 import java.time.Instant
 import java.util.UUID
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,8 +56,10 @@ private fun RadialTerminalScreen() {
     var mode by remember { mutableStateOf(SessionMode.GUARDED) }
     var command by remember { mutableStateOf("git status") }
     var gateResult by remember { mutableStateOf<GateResult?>(null) }
+    var evaluating by remember { mutableStateOf(false) }
     val sessionId = remember { UUID.randomUUID().toString() }
     val gate = remember { CommandGate() }
+    val scope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -72,8 +76,9 @@ private fun RadialTerminalScreen() {
 
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(14.dp)) {
-                Text("Target", style = MaterialTheme.typography.labelMedium)
+                Text("DEMO TARGET · NOT VERIFIED", style = MaterialTheme.typography.labelMedium)
                 Text("demo-host · SSH :22", style = MaterialTheme.typography.titleMedium)
+                Text("Transport is not connected in v0.2.")
                 Text(
                     "Session ${sessionId.take(8)}",
                     style = MaterialTheme.typography.bodySmall,
@@ -124,11 +129,7 @@ private fun RadialTerminalScreen() {
         ) {
             Column {
                 Text(
-                    "Radial Terminal v0.2",
-                    color = MaterialTheme.colorScheme.inverseOnSurface,
-                )
-                Text(
-                    "transport not connected",
+                    "DEMO TERMINAL · NO COMMANDS EXECUTE",
                     color = MaterialTheme.colorScheme.inverseOnSurface,
                 )
                 Spacer(Modifier.height(12.dp))
@@ -137,11 +138,7 @@ private fun RadialTerminalScreen() {
                     color = MaterialTheme.colorScheme.inverseOnSurface,
                 )
                 Text(
-                    "On branch feature/radial-terminal-v0.2-android-shell",
-                    color = MaterialTheme.colorScheme.inverseOnSurface,
-                )
-                Text(
-                    "nothing to commit, working tree clean",
+                    "Example output only",
                     color = MaterialTheme.colorScheme.inverseOnSurface,
                 )
             }
@@ -158,25 +155,34 @@ private fun RadialTerminalScreen() {
             modifier = Modifier.fillMaxWidth(),
             label = { Text("Command preflight") },
             singleLine = true,
+            enabled = !evaluating,
         )
 
         Spacer(Modifier.height(8.dp))
 
         Button(
             onClick = {
-                gateResult = gate.evaluate(
-                    mode = mode,
-                    request = PreflightRequest(
-                        sessionId = sessionId,
-                        hostId = "demo-host",
-                        command = command,
-                        requestedAt = Instant.now(),
-                    ),
-                )
+                evaluating = true
+                scope.launch {
+                    try {
+                        gateResult = gate.evaluate(
+                            mode = mode,
+                            request = PreflightRequest(
+                                sessionId = sessionId,
+                                hostId = "demo-host-unverified",
+                                command = command,
+                                requestedAt = Instant.now(),
+                            ),
+                        )
+                    } finally {
+                        evaluating = false
+                    }
+                }
             },
             modifier = Modifier.fillMaxWidth(),
+            enabled = !evaluating,
         ) {
-            Text(if (mode == SessionMode.DIRECT) "Run" else "Preflight")
+            Text(if (evaluating) "Evaluating…" else "Evaluate preflight")
         }
 
         gateResult?.let {
@@ -189,30 +195,31 @@ private fun RadialTerminalScreen() {
 @Composable
 private fun PreflightCard(result: GateResult) {
     val decision = when (result) {
-        is GateResult.Execute -> result.decision
+        is GateResult.Proceed -> result.decision
         is GateResult.Confirm -> result.decision
         is GateResult.Deny -> result.decision
     }
 
     val title = when (result) {
-        is GateResult.Execute -> "ALLOW · ready to execute"
+        is GateResult.Proceed ->
+            if (decision.assuranceBypassed) {
+                "DIRECT · assurance intentionally bypassed"
+            } else {
+                "ALLOW · preflight permits proceeding"
+            }
         is GateResult.Confirm -> "REVIEW · confirmation required"
-        is GateResult.Deny -> "BLOCK · execution denied"
+        is GateResult.Deny -> "BLOCK · do not proceed"
     }
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(14.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
-            if (decision == null) {
-                Text("Direct mode bypassed assurance evaluation.")
+            Text("Provider: ${decision.provider} ${decision.providerVersion}")
+            if (decision.findings.isEmpty()) {
+                Text("No classifier findings.")
             } else {
-                Text("Provider: ${decision.provider} ${decision.providerVersion}")
-                if (decision.findings.isEmpty()) {
-                    Text("No local risk findings.")
-                } else {
-                    decision.findings.forEach { finding ->
-                        Text("• ${finding.summary}")
-                    }
+                decision.findings.forEach { finding ->
+                    Text("• ${finding.summary}")
                 }
             }
         }
