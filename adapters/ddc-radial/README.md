@@ -1,55 +1,54 @@
 # DDC Radial Adapter
 
-This adapter is optional.
+This adapter is optional. Radial Terminal must remain usable without DDC.
 
-Radial Terminal must function as a standard SSH client when this adapter is
-absent, disabled, unreachable, or unsupported.
+## Execution model
+
+The adapter is asynchronous. It receives a normalized preflight envelope only after the operator has explicitly enabled Assured mode for the relevant profile.
+
+The local Guarded classifier always runs first. The DDC result is then combined monotonically:
+
+ALLOW < REVIEW < BLOCK
+
+The external provider may preserve or increase severity. It may never downgrade the local result.
+
+Examples:
+
+- local BLOCK + DDC ALLOW -> BLOCK
+- local REVIEW + DDC ALLOW -> REVIEW
+- local ALLOW + DDC REVIEW -> REVIEW
+- local ALLOW + DDC BLOCK -> BLOCK
 
 ## Input contract
 
-The adapter receives a normalized preflight envelope containing at minimum:
+The adapter receives at minimum:
 
 - session identifier
-- target/host identifier
+- target identity
 - requested command
 - request timestamp
-- local classifier findings
+- local classifier decision/findings
 - optional observed host state
-- explicit adapter policy/profile identifier
+- explicit policy/profile identifier
+
+Credentials and private SSH keys are never part of the request.
 
 ## Output contract
 
-The adapter maps the external result into:
+The adapter returns:
 
-- `ALLOW`
-- `REVIEW`
-- `BLOCK`
-
-and preserves:
-
-- provider identity
-- provider version
-- policy/version identifiers
-- findings/contradictions
+- ALLOW / REVIEW / BLOCK
+- provider identity and version
+- policy/version identifiers when applicable
+- structured findings/contradictions
 - decision timestamp
-- freshness or expiry information when supplied
-- evidence references when supplied
+- freshness/expiry when applicable
+- evidence references when applicable
 
 ## Failure behavior
 
-An external adapter failure must never silently become `ALLOW`.
-
-Recommended policy:
-
-- Direct mode: adapter is not called.
-- Guarded mode: local classifier remains authoritative for the local gate.
-- Assured mode: unavailable/invalid external assurance returns REVIEW or BLOCK
-  according to the host profile.
+Unavailable, failed, malformed, or stale external assurance becomes REVIEW. It never becomes ALLOW.
 
 ## Data boundary
 
-No command, terminal history, host state, or credential material may leave
-the device merely because the adapter exists. The operator must explicitly
-enable the adapter for the relevant profile.
-
-Credentials and private SSH keys are never part of the assurance request.
+No command, terminal history, host state, or credential material leaves the device merely because the adapter exists. External assurance is opt-in per host/profile.

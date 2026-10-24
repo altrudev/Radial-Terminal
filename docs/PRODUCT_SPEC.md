@@ -1,46 +1,64 @@
-# Radial Terminal v0.1 Product Specification
+# Radial Terminal v0.2 Product Specification
 
 ## User promise
 
-**Know what a remote command is likely to affect before running it, and keep
-a verifiable local record of what was requested and what the terminal
-observed afterward.**
+Evaluate a remote command before execution, make assurance bypasses visible, and preserve enough provenance to reconstruct what was requested, permitted, executed, and observed.
 
 ## Modes
 
 ### Direct
-Normal SSH terminal behavior.
+
+Bypasses assurance intentionally. The bypass itself is recorded as provenance. Direct mode must never masquerade as an assurance decision.
 
 ### Guarded
-Locally classify state-changing commands. REVIEW and BLOCK are surfaced
-before dispatch.
+
+Runs the local conservative classifier. Only explicitly recognized low-risk command families receive ALLOW. Unknown or opaque commands receive REVIEW.
 
 ### Assured
-Use a configured external assurance provider and create an evidence-rich
-receipt around execution.
 
-## v0.1 scope
+Runs the local Guarded baseline plus an optional external assurance provider. External assurance may preserve or increase severity; it may never downgrade the local result.
 
-- SSH host profiles
-- interactive terminal sessions
+Examples:
+
+ALLOW + REVIEW -> REVIEW
+REVIEW + ALLOW -> REVIEW
+BLOCK + ALLOW -> BLOCK
+ALLOW + BLOCK -> BLOCK
+
+Unavailable, failed, malformed, or stale external assurance degrades to REVIEW.
+
+## v0.2 scope
+
+- Android Compose operator shell
 - Direct / Guarded / Assured session modes
-- deterministic local command classifier
-- per-command disposition
-- explicit confirmation for REVIEW
-- hard stop for BLOCK unless policy explicitly defines a separate override
-  workflow
-- local JSON receipts
-- session export
-- assurance provider interface
-- DDC Radial adapter contract
+- deterministic local classifier
+- conservative unknown-command handling
+- bounded command input
+- explicit preflight result: ALLOW / REVIEW / BLOCK
+- monotonic local + external assurance composition
+- decision freshness field
+- structured receipt schema
 - no mandatory account
 - no telemetry
+- no command upload by default
+
+## Not yet implemented
+
+- live SSH transport
+- verified SSH host-key binding
+- terminal emulator integration
+- local receipt persistence
+- external DDC transport implementation
+- independent post-execution observation
+- Agent Replay export
+
+The UI must clearly identify these missing capabilities and must not imply that commands have executed.
 
 ## Explicit non-goals
 
-- replacing the remote shell
-- pretending to perfectly parse every shell dialect
-- autonomous command execution
-- silently intercepting commands without user-visible mode state
+- pretending textual classification is shell semantic proof
+- silently intercepting arbitrary terminal bytes and claiming command identity
+- autonomous privileged command execution
+- allowing an external provider to weaken a local BLOCK
 - requiring Altru.dev infrastructure
 - uploading terminal history by default
